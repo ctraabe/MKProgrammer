@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <string>
+#include <vector>
 
 class IntelHex
 {
@@ -23,9 +24,6 @@ public:
   // Read the next line of the hex file (returns true if successful)
   bool Next();
 
-  // Get the total number of data bytes recorded in this hex file.
-  int TotalDataBytes();
-
   // Read various records from the current line of the hex file.
   int GetAddress() const;
   int GetDataCount() const;
@@ -37,20 +35,24 @@ private:
     std::streampos hex_file_position;
     int address_offset;
   };
+
   enum RecordType GetRecordType() const;
 
+  void Scan();
+  void GoToFirstLine();
   void GoToFinalLine();
   void GoToPreviousLine();
   void GoToBeginningOfLine();
   void GoToLineAtPosition(std::streampos position);
+  void Close();
 
   std::ifstream hex_file_;
+  std::string hex_filename_;
   std::string current_line_;
   std::streampos current_line_position_;
 
   bool end_of_file_;
-  int total_data_bytes_;
-  ExtendedAddressBlock extended_address_block_[16];
+  std::vector<ExtendedAddressBlock> extended_address_block_vector_;
 };
 
 #endif // INTEL_HEX_H_

@@ -1,5 +1,6 @@
 #include <iostream>
 
+#include "crc16.hpp"
 #include "intel_hex.hpp"
 #include "program_options.hpp"
 
@@ -10,21 +11,18 @@ int main (const int argc, const char* const argv[])
     return 1;
 
   IntelHex hex(program_options.hex_filename());
-/*
-  std::cout << hex.GetDataCount() << std::endl;
-  for (int i = 0; i < hex.GetDataCount(); ++i)
-  {
-    std::cout << hex.GetData(i) << ' ';
+
+  for (int k = 0; k < 3; k++) {
+    int counter = 0;
+    CRC16 crc;
+    while(counter < 4096) {
+      for (int i = 0; i < hex.GetDataCount(); ++i)
+        crc.Update(hex.GetData(i));
+      counter += hex.GetDataCount();
+      hex.Next();
+    }
+    std::cout << std::hex << crc.result() << std::endl;
   }
-  std::cout << hex.GetChecksum() << std::endl;
-  while (hex.Next())
-  {
-    std::cout << hex.GetAddress() << std::endl;
-  }
-  hex.Next();
-  hex.Next();
-  hex.Next();
-  hex.Next();
-*/
+
   return 0;
 }

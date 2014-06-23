@@ -1,12 +1,16 @@
 #include <iostream>
 
 #include "intel_hex.hpp"
+#include "program_options.hpp"
 
 int main (const int argc, const char* const argv[])
 {
-  IntelHex hex("sample.hex");
+  ProgramOptions program_options(argc, argv);
+  if (program_options)
+    return 1;
 
-  std::cout << hex.TotalDataBytes() << std::endl;
+  IntelHex hex(program_options.hex_filename());
+/*
   std::cout << hex.GetDataCount() << std::endl;
   for (int i = 0; i < hex.GetDataCount(); ++i)
   {
@@ -21,6 +25,6 @@ int main (const int argc, const char* const argv[])
   hex.Next();
   hex.Next();
   hex.Next();
-
+*/
   return 0;
 }

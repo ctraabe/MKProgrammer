@@ -1,7 +1,8 @@
+# MODIFIED Makefile by Chris Raabe
 TARGET     := mk-programmer
 
 CXXFLAGS   := -std=c++11
-LDLIBS     := -lm
+LDLIBS     := -lm -lboost_program_options
 LDFLAGS    := -g
 
 CXX        := g++

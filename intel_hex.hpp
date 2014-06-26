@@ -18,17 +18,13 @@ public:
 
   IntelHex(const std::string &hex_file_name);
 
-  // Is the 
   operator bool() const { return hex_file_.is_open(); }
 
-  // Read the next line of the hex file (returns true if successful)
-  bool Next();
+  // The number of program bytes recorded in the hex file
+  int size() const { return total_bytes_; }
 
-  // Read various records from the current line of the hex file.
-  int GetAddress() const;
-  int GetDataCount() const;
-  int GetData(int n) const;
-  int GetChecksum() const;
+  // Read the next byte of the hex file (returns true if successful)
+  int GetByte();
 
 private:
   struct ExtendedAddressBlock {
@@ -36,9 +32,18 @@ private:
     int address_offset;
   };
 
-  enum RecordType GetRecordType() const;
+  // Get the next line of the hex file.
+  bool GetLine();
 
+  // Read various records from the current line of the hex file.
+  int GetAddress() const;
+  int GetData(int n) const;
+  int GetChecksum() const;
+
+  // Scan the hex file to discover any extended address blocks and do a little
+  // bit of error checking.
   void Scan();
+
   void GoToFirstLine();
   void GoToFinalLine();
   void GoToPreviousLine();
@@ -50,6 +55,10 @@ private:
   std::string hex_filename_;
   std::string current_line_;
   std::streampos current_line_position_;
+  enum RecordType current_line_record_type_;
+  int current_line_byte_count_;
+  int current_line_bytes_read_;
+  int total_bytes_;
 
   bool end_of_file_;
   std::vector<ExtendedAddressBlock> extended_address_block_vector_;

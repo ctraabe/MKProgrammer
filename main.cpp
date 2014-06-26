@@ -11,17 +11,21 @@ int main (const int argc, const char* const argv[])
     return 1;
 
   IntelHex hex(program_options.hex_filename());
+  if (!hex)
+    return 1;
 
-  for (int k = 0; k < 3; k++) {
-    int counter = 0;
+  int tx_block_size = 4096;
+  for (int bytes_sent = 0; bytes_sent < hex.size(); bytes_sent += tx_block_size)
+  {
+    uint8_t tx_block[tx_block_size + 2];  // includes 16-bit CRC
     CRC16 crc;
-    while(counter < 4096) {
-      for (int i = 0; i < hex.GetDataCount(); ++i)
-        crc.Update(hex.GetData(i));
-      counter += hex.GetDataCount();
-      hex.Next();
+    for (int i = 0; i < tx_block_size; ++i)
+    {
+      tx_block[i] = hex.GetByte();
+      crc.Update(tx_block[i]);
     }
-    std::cout << std::hex << crc.result() << std::endl;
+    tx_block[tx_block_size] = crc.result() >> 8;
+    tx_block[tx_block_size+1] = crc.result() & 0xFF;
   }
 
   return 0;

@@ -21,33 +21,66 @@ IntelHex::IntelHex(const std::string &hex_filename)
 // ============================================================================+
 // Public functions:
 
+int IntelHex::GetByte()
+{
+  while (!end_of_file_)
+  {
+    if (current_line_bytes_read_ < current_line_byte_count_)
+    {
+      return GetData(++current_line_bytes_read_);
+    }
+    else
+    {
+      do {
+        GetLine();
+      } while (current_line_record_type_ == RECORD_TYPE_EXTENDED_ADDRESS);
+    }
+  }
+
+  return -1;
+}
+
+
+// ============================================================================+
+// Private  functions:
+
 // Read the next line of the hex file.
-bool IntelHex::Next()
+bool IntelHex::GetLine()
 {
   if (!hex_file_.is_open()) return false;
   current_line_position_ = hex_file_.tellg();
-  end_of_file_ = (end_of_file_
-    || std::getline(hex_file_, current_line_).eof()
-    || (current_line_.length() < 12)
-    || (GetRecordType() == RECORD_TYPE_END_OF_FILE));
-  return !end_of_file_;
-}
-
-// -----------------------------------------------------------------------------
-// Read the record type for the current line of the hex file.
-enum IntelHex::RecordType IntelHex::GetRecordType() const
-{
-  if (!hex_file_.is_open()) return RECORD_TYPE_UNSUPPORTED;
-
-  constexpr int kRecordTypePos = 7;
-  constexpr int kRecordTypeLen = 2;
-
-  int raw_value = std::stoi(current_line_.substr(kRecordTypePos,
-    kRecordTypeLen), nullptr, 16);
-  if (raw_value >= 0 && raw_value < 4)
-    return static_cast<IntelHex::RecordType>(raw_value);
+  if(end_of_file_ || std::getline(hex_file_, current_line_).eof()
+    || (current_line_.length() < 12))
+  {
+    current_line_record_type_ = RECORD_TYPE_END_OF_FILE;
+    current_line_byte_count_ = 0;
+    current_line_bytes_read_ = 0;
+    end_of_file_ = true;
+  }
   else
-    return RECORD_TYPE_UNSUPPORTED;
+  {
+    // Read the record type and number of data bytes for the current line of the
+    // hex file.
+    constexpr int kRecordTypePos = 7;
+    constexpr int kRecordTypeLen = 2;
+    constexpr int kByteCountPos = 1;
+    constexpr int kByteCountLen = 2;
+
+    int raw_type = std::stoi(current_line_.substr(kRecordTypePos,
+      kRecordTypeLen), nullptr, 16);
+    if (raw_type >= 0 && raw_type < 4)
+      current_line_record_type_ = static_cast<IntelHex::RecordType>(raw_type);
+    else
+      current_line_record_type_ = RECORD_TYPE_UNSUPPORTED;
+    current_line_byte_count_ =  std::stoi(current_line_.substr(kByteCountPos,
+      kByteCountLen), nullptr, 16);
+
+    current_line_bytes_read_ = 0;
+
+    end_of_file_ = current_line_record_type_ == RECORD_TYPE_END_OF_FILE;
+  }
+
+  return !end_of_file_;
 }
 
 // -----------------------------------------------------------------------------
@@ -60,19 +93,6 @@ int IntelHex::GetAddress() const
   constexpr int kAddressLen = 4;
 
   return std::stoi(current_line_.substr(kAddressPos, kAddressLen), nullptr, 16);
-}
-
-// -----------------------------------------------------------------------------
-// Read the number of data bytes for the current line of the hex file.
-int IntelHex::GetDataCount() const
-{
-  if (!hex_file_.is_open()) return -1;
-
-  constexpr int kByteCountPos = 1;
-  constexpr int kByteCountLen = 2;
-
-  return std::stoi(current_line_.substr(kByteCountPos, kByteCountLen), nullptr,
-    16);
 }
 
 // -----------------------------------------------------------------------------
@@ -98,10 +118,6 @@ int IntelHex::GetChecksum() const
     16);
 }
 
-
-// ============================================================================+
-// Private  functions:
-
 // Scan the hex file to discover any extended address blocks and do a little bit
 // of error checking.
 void IntelHex::Scan()
@@ -111,17 +127,24 @@ void IntelHex::Scan()
   // Make sure to start at the beginning of the file.
   GoToFirstLine();
 
-  int last_address = 0, line_number = 0, total_data_bytes = 0;
+  int line_number = 0, total_bytes_ = 0;
   do
   {
     ++line_number;
-    switch (GetRecordType())
+    switch (current_line_record_type_)
     {
       case RECORD_TYPE_DATA:
       {
-        int data_count = GetDataCount();
-        total_data_bytes += data_count;
-        last_address = GetAddress() + data_count;
+        int address = GetAddress()
+          + extended_address_block_vector_.back().address_offset;
+        if (address != total_bytes_)
+        {
+          std::cerr << "ERROR: Data at " << hex_filename_ << ": " << line_number
+            << " is not contiguous with preceding data." << std::endl;
+          Close();
+          return;
+        }
+        total_bytes_ += current_line_byte_count_;
         break;
       }
       case RECORD_TYPE_EXTENDED_ADDRESS:
@@ -130,11 +153,10 @@ void IntelHex::Scan()
         extended_address_block.hex_file_position = current_line_position_;
         extended_address_block.address_offset = (GetData(0) << 12)
           + (GetData(1) << 4);
-        if (extended_address_block.address_offset != last_address
-          + extended_address_block_vector_.back().address_offset)
+        if (extended_address_block.address_offset != total_bytes_)
         {
           std::cerr << "ERROR: The extended address block 0x" << std::hex
-            << extended_address_block.address_offset << " (" << hex_filename_
+            << extended_address_block.address_offset << " at " << hex_filename_
             << ": " << std::dec << line_number
             << ") is not contiguous with the preceding data." << std::endl;
           Close();
@@ -145,31 +167,18 @@ void IntelHex::Scan()
       }
       default:
       {
-        std::cerr << "ERROR: Can't interpret " << hex_filename_ << " line "
+        std::cerr << "ERROR: Can't interpret text at " << hex_filename_ << ": "
           << line_number << "." << std::endl;
         Close();
         return;
         break;
       }
     }
-  } while (Next());
+  } while (GetLine());
 
-  if (total_data_bytes != last_address
-    + extended_address_block_vector_.back().address_offset)
-  {
-    std::cout << total_data_bytes << " : " << last_address
-    + extended_address_block_vector_.back().address_offset << std::endl;
-    std::cerr << "ERROR: The number of bytes specified in " << hex_filename_
-      << " does not match the address space." << std::endl;
-    Close();
-  }
-  else
-  {
-    std::cout << hex_filename_ << " contains " << total_data_bytes
-      << " bytes in "  << extended_address_block_vector_.size() << " block(s)."
-      << std::endl;
-    GoToFirstLine();
-  }
+  std::cout << hex_filename_ << " contains " << total_bytes_ << " bytes in "
+    << extended_address_block_vector_.size() << " block(s)." << std::endl;
+  GoToFirstLine();
 }
 
 // -----------------------------------------------------------------------------
@@ -204,7 +213,7 @@ void IntelHex::GoToBeginningOfLine()
   while (hex_file_.tellg() && hex_file_.peek() != ':')
     hex_file_.unget();
   end_of_file_ = false;
-  Next();
+  GetLine();
 }
 
 // -----------------------------------------------------------------------------

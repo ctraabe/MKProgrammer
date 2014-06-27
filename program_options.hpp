@@ -8,13 +8,13 @@ class ProgramOptions
 public:
   ProgramOptions(const int argc, const char* const argv[]);
 
-  operator bool() const { return return_; }
+  operator bool() const { return continue_program_; }
 
   std::string hex_filename() const { return hex_filename_; }
 
 private:
   ProgramOptions() {}
-  bool return_;
+  bool continue_program_;
 
   std::string hex_filename_;
 };

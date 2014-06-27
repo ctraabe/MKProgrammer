@@ -7,7 +7,7 @@ using namespace boost::program_options;
 
 ProgramOptions::ProgramOptions(const int argc, const char* const argv[])
   : hex_filename_("input.hex")
-  , return_(false)
+  , continue_program_(true)
 {
   try
   {
@@ -37,7 +37,7 @@ ProgramOptions::ProgramOptions(const int argc, const char* const argv[])
     if (vm.count("help"))
     {
       std::cout << visible << "\n";
-      return_ = true;
+      continue_program_ = false;
     }
 
     if (vm.count("input-file"))
@@ -48,6 +48,6 @@ ProgramOptions::ProgramOptions(const int argc, const char* const argv[])
   catch (std::exception& e)
   {
     std::cerr << e.what() << "\n\n";
-    return_ = true;
+    continue_program_ = false;
   }
 }

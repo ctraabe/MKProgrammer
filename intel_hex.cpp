@@ -4,6 +4,7 @@
 
 IntelHex::IntelHex(const std::string &hex_filename)
   : hex_filename_(hex_filename)
+  , total_bytes_(0)
   , end_of_file_(false)
 {
   // Initialize the extended address block vector with a 0,0 entry.
@@ -69,7 +70,7 @@ bool IntelHex::GetLine()
     int raw_type = std::stoi(current_line_.substr(kRecordTypePos,
       kRecordTypeLen), nullptr, 16);
     if (raw_type >= 0 && raw_type < 4)
-      current_line_record_type_ = static_cast<IntelHex::RecordType>(raw_type);
+      current_line_record_type_ = static_cast<RecordType>(raw_type);
     else
       current_line_record_type_ = RECORD_TYPE_UNSUPPORTED;
     current_line_byte_count_ =  std::stoi(current_line_.substr(kByteCountPos,
@@ -127,7 +128,7 @@ void IntelHex::Scan()
   // Make sure to start at the beginning of the file.
   GoToFirstLine();
 
-  int line_number = 0, total_bytes_ = 0;
+  int line_number = 0;
   do
   {
     ++line_number;

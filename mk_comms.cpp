@@ -75,7 +75,7 @@ bool MKComms::RequestBLComms()
 
   // Set the device.
   serial_.SendByte('T');
-  serial_.SendByte(signature[1]);
+  serial_.SendByte(signature[0]);
   uint8_t okay[1];
   if (!GetResponse(okay, 1, "Set device"))
     return false;
@@ -118,9 +118,9 @@ bool MKComms::RequestClearFlash(const int blocks_to_clear) const
     const int bytes_to_clear = blocks_to_clear * program_block_size_;
     uint8_t header[4] = {
       'X',
-      (uint8_t)((blocks_to_clear >> 16) & 0xFF),
-      (uint8_t)((blocks_to_clear >> 8) & 0xFF),
-      (uint8_t)(blocks_to_clear & 0xFF)
+      (uint8_t)((bytes_to_clear >> 16) & 0xFF),
+      (uint8_t)((bytes_to_clear >> 8) & 0xFF),
+      (uint8_t)(bytes_to_clear & 0xFF)
     };
     serial_.SendBuffer(header, sizeof(header));
     uint8_t okay[1];
@@ -132,6 +132,8 @@ bool MKComms::RequestClearFlash(const int blocks_to_clear) const
         << std::endl;
       return false;
     }
+    std::cout << "Requesting " << bytes_to_clear << " bytes to be cleared."
+      << std::endl;
   }
 
   serial_.SendByte('e');
@@ -144,6 +146,7 @@ bool MKComms::RequestClearFlash(const int blocks_to_clear) const
       << std::endl;
     return false;
   }
+  std::cout << " done" << std::endl;
   return true;
 }
 
@@ -186,7 +189,7 @@ bool MKComms::SendProgramBlock(const uint8_t* const block, const int crc) const
   uint8_t okay[1];
   if (!GetResponse(okay, 1, "Block programming"))
     return false;
-  if (okay[0] != 0x00)
+  if (okay[0] != 0x0D)
   {
     std::cerr << "ERROR: Device responded to CRC with " << (int)okay[0]
       << std::endl;
@@ -246,7 +249,7 @@ bool MKComms::GetResponse(uint8_t* const response, const int response_length,
   int rx_bytes_read, total_bytes_read = 0;
 
   // Poll the serial port for up to 1 second(ish).
-  constexpr int kPollingDuration = 1;  // Seconds
+  constexpr int kPollingDuration = 5;  // Seconds
   constexpr int kPollingFrequency = 100;  // Hz
   for (int i = 0; (total_bytes_read < response_length)
     && (i < (kPollingFrequency * kPollingDuration)); ++i)

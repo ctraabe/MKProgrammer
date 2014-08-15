@@ -28,7 +28,7 @@ int IntelHex::GetByte()
   {
     if (current_line_bytes_read_ < current_line_byte_count_)
     {
-      return GetData(++current_line_bytes_read_);
+      return GetData(current_line_bytes_read_++);
     }
     else
     {
@@ -97,7 +97,7 @@ int IntelHex::GetAddress() const
 }
 
 // -----------------------------------------------------------------------------
-// Read a data byte from the current line of the hex file.
+// Read a data byte from the current line of the hex file (zero-indexed).
 // TODO: check that the requested index is valid
 int IntelHex::GetData(int n) const
 {

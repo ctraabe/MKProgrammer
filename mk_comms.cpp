@@ -7,6 +7,8 @@
 #include <iostream>
 #include <thread>
 
+#include "crc16.hpp"
+
 // ============================================================================+
 // Public functions:
 
@@ -108,14 +110,19 @@ bool MKComms::RequestBLComms()
   program_block_size_ = (program_block_size[1] << 8) | program_block_size[2];
   std::cout << "Program block size: " << program_block_size_ << std::endl;
 
+  if (program_block_size_ < 1)
+  {
+    std::cerr << "ERROR: Unexpected program block size." << std::endl;
+    return false;
+  }
+
   return true;
 }
 
-bool MKComms::RequestClearFlash(const int blocks_to_clear) const
+bool MKComms::RequestClearFlash(const int bytes_to_clear) const
 {
   if (device_type_ == DEVICE_TYPE_STR911)
   {
-    const int bytes_to_clear = blocks_to_clear * program_block_size_;
     uint8_t header[4] = {
       'X',
       (uint8_t)((bytes_to_clear >> 16) & 0xFF),
@@ -150,6 +157,38 @@ bool MKComms::RequestClearFlash(const int blocks_to_clear) const
   return true;
 }
 
+bool MKComms::SendProgram(const uint8_t* const program, const int size) const
+{
+  // Start programming from address 0x0000
+  // NOTE: MikroKopter Tool starts programming from the second block so this
+  // may need to be changed to match that in the future.
+  if (!RequestAddress(0x0000))
+    return false;
+
+  // Calculate the number of programming blocks to be transmitted.
+  const int block_count = (size - 1) / program_block_size_ + 1;
+
+  for (int i = 0; i < block_count; ++i)
+  {
+    std::cout << "Programming block " << i + 1 << " of " << block_count << "."
+      << std::endl;
+    if (!SendProgramBlock(program + i * program_block_size_))
+    {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool MKComms::Exit() const
+{
+  serial_.SendByte('E');
+}
+
+
+// ============================================================================+
+// Private  functions:
+
 bool MKComms::RequestAddress(const int address) const
 {
   uint8_t header[3] = {
@@ -170,7 +209,7 @@ bool MKComms::RequestAddress(const int address) const
   return true;
 }
 
-bool MKComms::SendProgramBlock(const uint8_t* const block, const int crc) const
+bool MKComms::SendProgramBlock(const uint8_t* const block) const
 {
   uint8_t header[4] = {
     'B',
@@ -182,9 +221,15 @@ bool MKComms::SendProgramBlock(const uint8_t* const block, const int crc) const
 
   serial_.SendBuffer(block, program_block_size_);
 
+  CRC16 crc;
+  for (int i = 0; i < program_block_size_; ++i)
+  {
+    crc.Update(block[i]);
+  }
+
   uint8_t crc_buffer[2];
-  crc_buffer[0] = crc >> 8;
-  crc_buffer[1] = crc & 0xFF;
+  crc_buffer[0] = crc.result() >> 8;
+  crc_buffer[1] = crc.result() & 0xFF;
   serial_.SendBuffer(crc_buffer, sizeof(crc_buffer)) > 0;
   uint8_t okay[1];
   if (!GetResponse(okay, 1, "Block programming"))
@@ -197,15 +242,6 @@ bool MKComms::SendProgramBlock(const uint8_t* const block, const int crc) const
   }
   return true;
 }
-
-bool MKComms::Exit() const
-{
-  serial_.SendByte('E');
-}
-
-
-// ============================================================================+
-// Private  functions:
 
 int MKComms::RequestDeviceReset() const
 {

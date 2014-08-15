@@ -29,13 +29,14 @@ public:
   int program_block_size() const { return program_block_size_; }
 
   bool RequestBLComms();
-  bool RequestClearFlash(const int blocks_to_clear) const;
-  bool RequestAddress(const int address) const;
-  bool SendProgramBlock(const uint8_t* const block, const int crc) const;
+  bool RequestClearFlash(const int bytes_to_clear) const;
+  bool SendProgram(const uint8_t* const program, const int size) const;
   bool Exit() const;
   void Close();
 
 private:
+  bool RequestAddress(const int address) const;
+  bool SendProgramBlock(const uint8_t* const block) const;
   int RequestDeviceReset() const;
   bool CheckResponse(const uint8_t* const expected_response,
     const int expected_response_length);

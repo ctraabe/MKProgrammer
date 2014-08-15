@@ -5,42 +5,16 @@
 IntelHex::IntelHex(const std::string &hex_filename)
   : hex_filename_(hex_filename)
   , total_bytes_(0)
+  , program_()
   , end_of_file_(false)
 {
-  // Initialize the extended address block vector with a 0,0 entry.
-  ExtendedAddressBlock extended_address_block = {};  // zeros
-  extended_address_block_vector_.push_back(extended_address_block);
-
   // Open the hex file and scan it to discover any extended address blocks.
   hex_file_.open(hex_filename);
   if (hex_file_)
-    Scan();
+    Read();
   else
     std::cerr << "ERROR: Couldn't open " << hex_filename << std::endl;
 }
-
-// ============================================================================+
-// Public functions:
-
-int IntelHex::GetByte()
-{
-  while (!end_of_file_)
-  {
-    if (current_line_bytes_read_ < current_line_byte_count_)
-    {
-      return GetData(current_line_bytes_read_++);
-    }
-    else
-    {
-      do {
-        GetLine();
-      } while (current_line_record_type_ == RECORD_TYPE_EXTENDED_ADDRESS);
-    }
-  }
-
-  return -1;
-}
-
 
 // ============================================================================+
 // Private  functions:
@@ -55,7 +29,6 @@ bool IntelHex::GetLine()
   {
     current_line_record_type_ = RECORD_TYPE_END_OF_FILE;
     current_line_byte_count_ = 0;
-    current_line_bytes_read_ = 0;
     end_of_file_ = true;
   }
   else
@@ -75,8 +48,6 @@ bool IntelHex::GetLine()
       current_line_record_type_ = RECORD_TYPE_UNSUPPORTED;
     current_line_byte_count_ =  std::stoi(current_line_.substr(kByteCountPos,
       kByteCountLen), nullptr, 16);
-
-    current_line_bytes_read_ = 0;
 
     end_of_file_ = current_line_record_type_ == RECORD_TYPE_END_OF_FILE;
   }
@@ -119,14 +90,14 @@ int IntelHex::GetChecksum() const
     16);
 }
 
-// Scan the hex file to discover any extended address blocks and do a little bit
-// of error checking.
-void IntelHex::Scan()
+// Reads the contents of the hex file into RAM (program_).
+void IntelHex::Read()
 {
   if (!hex_file_.is_open()) return;
 
   // Make sure to start at the beginning of the file.
   GoToFirstLine();
+  int extended_address = 0;
 
   int line_number = 0;
   do
@@ -136,34 +107,19 @@ void IntelHex::Scan()
     {
       case RECORD_TYPE_DATA:
       {
-        int address = GetAddress()
-          + extended_address_block_vector_.back().address_offset;
-        if (address != total_bytes_)
-        {
-          std::cerr << "ERROR: Data at " << hex_filename_ << ": " << line_number
-            << " is not contiguous with preceding data." << std::endl;
-          Close();
-          return;
-        }
-        total_bytes_ += current_line_byte_count_;
+        int address = extended_address + GetAddress();
+        // Read the data into the program array.
+        for (int i = 0; i < current_line_byte_count_; ++i)
+          program_[address + i] = GetData(i);
+        // Update estimate for total program bytes.
+        int temp = address + current_line_byte_count_;
+        if (temp > total_bytes_)
+          total_bytes_ = temp;
         break;
       }
       case RECORD_TYPE_EXTENDED_ADDRESS:
       {
-        ExtendedAddressBlock extended_address_block;
-        extended_address_block.hex_file_position = current_line_position_;
-        extended_address_block.address_offset = (GetData(0) << 12)
-          + (GetData(1) << 4);
-        if (extended_address_block.address_offset != total_bytes_)
-        {
-          std::cerr << "ERROR: The extended address block 0x" << std::hex
-            << extended_address_block.address_offset << " at " << hex_filename_
-            << ": " << std::dec << line_number
-            << ") is not contiguous with the preceding data." << std::endl;
-          Close();
-          return;
-        }
-        extended_address_block_vector_.push_back(extended_address_block);
+        extended_address = (GetData(0) << 12) + (GetData(1) << 4);
         break;
       }
       default:
@@ -177,11 +133,11 @@ void IntelHex::Scan()
     }
   } while (GetLine());
 
-  std::cout << hex_filename_ << " contains " << total_bytes_ << " bytes in "
-    << extended_address_block_vector_.size() << " block(s)." << std::endl;
+  std::cout << hex_filename_ << " contains " << total_bytes_ << " bytes."
+    << std::endl;
+
   GoToFirstLine();
 }
-
 // -----------------------------------------------------------------------------
 // Go to the final line of the hex file (should an end of file record).
 void IntelHex::GoToFirstLine()

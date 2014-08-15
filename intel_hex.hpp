@@ -22,15 +22,10 @@ public:
 
   // The number of program bytes recorded in the hex file
   int size() const { return total_bytes_; }
-
-  // Read the next byte of the hex file (returns true if successful)
-  int GetByte();
+  uint8_t* program() { return program_; }
 
 private:
-  struct ExtendedAddressBlock {
-    std::streampos hex_file_position;
-    int address_offset;
-  };
+  IntelHex();
 
   // Get the next line of the hex file.
   bool GetLine();
@@ -40,9 +35,7 @@ private:
   int GetData(int n) const;
   int GetChecksum() const;
 
-  // Scan the hex file to discover any extended address blocks and do a little
-  // bit of error checking.
-  void Scan();
+  void Read();
 
   void GoToFirstLine();
   void GoToFinalLine();
@@ -57,11 +50,10 @@ private:
   std::streampos current_line_position_;
   enum RecordType current_line_record_type_;
   int current_line_byte_count_;
-  int current_line_bytes_read_;
   int total_bytes_;
+  uint8_t program_[1024*1024];
 
   bool end_of_file_;
-  std::vector<ExtendedAddressBlock> extended_address_block_vector_;
 };
 
 #endif // INTEL_HEX_H_

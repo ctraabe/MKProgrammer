@@ -52,7 +52,7 @@ bool MKComms::RequestBLComms()
   // Read the device signature.
   serial_.SendByte('t');
   uint8_t signature[2];
-  if (!GetResponse(signature, 2, "Signature"))
+  if (!GetResponse(signature, 2, 2, "Signature"))
     return false;
 
   // Process the device signature.
@@ -79,7 +79,7 @@ bool MKComms::RequestBLComms()
   serial_.SendByte('T');
   serial_.SendByte(signature[0]);
   uint8_t okay[1];
-  if (!GetResponse(okay, 1, "Set device"))
+  if (!GetResponse(okay, 1, 1, "Set device"))
     return false;
   if (okay[0] != 0x0D)
   {
@@ -90,16 +90,21 @@ bool MKComms::RequestBLComms()
 
   // Read the bootloader version.
   serial_.SendByte('V');
-  uint8_t version[2];
-  if (!GetResponse(version, 2, "Bootloader version"))
+  uint8_t version[3];
+  int version_length = GetResponse(version, 2, 3, "Bootloader version");
+  if (version_length == 2)
+    std::cout << "MikroKopter bootloader V" << version[0] << "." << version[1]
+      << std::endl;
+  else if (version_length == 3)
+    std::cout << "MikroKopter bootloader V" << version[0] << "." << version[1]
+      << version[2] << std::endl;
+  else
     return false;
-  std::cout << "MikroKopter bootloader V" << version[0] << "." << version[1]
-    << std::endl;
 
   // Read the devices programming block size.
   serial_.SendByte('b');
   uint8_t program_block_size[3];
-  if (!GetResponse(program_block_size, 3, "Program block size"))
+  if (!GetResponse(program_block_size, 3, 3, "Program block size"))
     return false;
   if (program_block_size[0] != 'Y')
   {
@@ -131,7 +136,7 @@ bool MKComms::RequestClearFlash(const int bytes_to_clear) const
     };
     serial_.SendBuffer(header, sizeof(header));
     uint8_t okay[1];
-    if (!GetResponse(okay, 1, "Set clear size"))
+    if (!GetResponse(okay, 1, 1, "Set clear size"))
       return false;
     if (okay[0] != 0x0D)
     {
@@ -145,7 +150,7 @@ bool MKComms::RequestClearFlash(const int bytes_to_clear) const
 
   serial_.SendByte('e');
   uint8_t okay[1];
-  if (!GetResponse(okay, 1, "Clear flash"))
+  if (!GetResponse(okay, 1, 1, "Clear flash"))
     return false;
   if (okay[0] != 0x0D)
   {
@@ -198,7 +203,7 @@ bool MKComms::RequestAddress(const int address) const
   };
   serial_.SendBuffer(header, sizeof(header));
   uint8_t okay[1];
-  if (!GetResponse(okay, 1, "Set address"))
+  if (!GetResponse(okay, 1, 1, "Set address"))
     return false;
   if (okay[0] != 0x0D)
   {
@@ -232,7 +237,7 @@ bool MKComms::SendProgramBlock(const uint8_t* const block) const
   crc_buffer[1] = crc.result() & 0xFF;
   serial_.SendBuffer(crc_buffer, sizeof(crc_buffer)) > 0;
   uint8_t okay[1];
-  if (!GetResponse(okay, 1, "Block programming"))
+  if (!GetResponse(okay, 1, 1, "Block programming"))
     return false;
   if (okay[0] != 0x0D)
   {
@@ -277,23 +282,23 @@ bool MKComms::CheckResponse(const uint8_t* const expected_response,
   return false;
 }
 
-bool MKComms::GetResponse(uint8_t* const response, const int response_length,
-  const std::string &request_string) const
+int MKComms::GetResponse(uint8_t* const response, const int min_response_length,
+  const int max_response_length, const std::string &request_string) const
 {
   constexpr int kBufferSize = 255;
   uint8_t rx_buffer[kBufferSize];
   int rx_bytes_read, total_bytes_read = 0;
 
-  // Poll the serial port for up to 1 second(ish).
-  constexpr int kPollingDuration = 5;  // Seconds
+  // Poll the serial port.
+  constexpr int kPollingDuration = 2;  // Seconds
   constexpr int kPollingFrequency = 100;  // Hz
-  for (int i = 0; (total_bytes_read < response_length)
-    && (i < (kPollingFrequency * kPollingDuration)); ++i)
+  for (int i = kPollingFrequency * kPollingDuration;
+    (total_bytes_read < min_response_length) && i--; )
   {
     std::this_thread::sleep_for(std::chrono::milliseconds(1000
       / kPollingFrequency));
     rx_bytes_read = serial_.Read(rx_buffer, kBufferSize);
-    if ((total_bytes_read + rx_bytes_read) <= response_length)
+    if ((total_bytes_read + rx_bytes_read) <= max_response_length)
     {
       for (int j = 0; j < rx_bytes_read; ++j)
         response[total_bytes_read+j] = rx_buffer[j];
@@ -301,14 +306,19 @@ bool MKComms::GetResponse(uint8_t* const response, const int response_length,
     total_bytes_read += rx_bytes_read;
   }
 
-  if (total_bytes_read != response_length)
+  if ((total_bytes_read < min_response_length) || (total_bytes_read
+      > max_response_length))
   {
-    std::cerr << "ERROR: " << request_string << " request expected "
-      << response_length << " byte(s) in response, got " << total_bytes_read
-      << "." << std::endl;
-    return false;
+    std::cerr << "ERROR: " << request_string << " request expected ";
+    if (min_response_length == max_response_length)
+      std::cerr << min_response_length;
+    else
+      std::cerr << min_response_length << "to" << max_response_length;
+    std::cerr << " byte(s) in response, got " << total_bytes_read << "."
+      << std::endl;
+    return 0;
   }
-  return true;
+  return total_bytes_read;
 }
 
 void MKComms::Close()

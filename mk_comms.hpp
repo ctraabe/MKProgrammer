@@ -40,8 +40,8 @@ private:
   int RequestDeviceReset() const;
   bool CheckResponse(const uint8_t* const expected_response,
     const int expected_response_length);
-  bool GetResponse(uint8_t* const response, const int response_length,
-    const std::string &request_string) const;
+  int GetResponse(uint8_t* const response, const int min_response_length,
+    const int max_response_length, const std::string &request_string) const;
 
   Serial serial_;
   enum DeviceType device_type_;

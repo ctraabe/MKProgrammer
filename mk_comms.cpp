@@ -290,7 +290,7 @@ int MKComms::GetResponse(uint8_t* const response, const int min_response_length,
   int rx_bytes_read, total_bytes_read = 0;
 
   // Poll the serial port.
-  constexpr int kPollingDuration = 2;  // Seconds
+  constexpr int kPollingDuration = 5;  // Seconds
   constexpr int kPollingFrequency = 100;  // Hz
   for (int i = kPollingFrequency * kPollingDuration;
     (total_bytes_read < min_response_length) && i--; )

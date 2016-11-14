@@ -17,7 +17,7 @@ int main (const int argc, const char* const argv[])
     return 1;
 
   // Open serial communications with a MikroKopter device (bootloader).
-  MKComms mk_comms("/dev/ttyUSB0");
+  MKComms mk_comms(program_options.serial_port());
   if (!mk_comms)
     return 1;
 

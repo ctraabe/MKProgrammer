@@ -7,6 +7,7 @@ using namespace boost::program_options;
 
 ProgramOptions::ProgramOptions(const int argc, const char* const argv[])
   : hex_filename_("input.hex")
+  , serial_port_("/dev/ttyUSB0")
   , continue_program_(true)
 {
   try
@@ -15,6 +16,7 @@ ProgramOptions::ProgramOptions(const int argc, const char* const argv[])
     options_description visible("Allowed options");
     visible.add_options()
       ("help,h", "produce help message")
+      ("port,p", value<std::string>()->implicit_value(serial_port_), "serial port")
       ;
 
     // Hidden options, will not be shown to the user.
@@ -38,6 +40,11 @@ ProgramOptions::ProgramOptions(const int argc, const char* const argv[])
     {
       std::cout << visible << "\n";
       continue_program_ = false;
+    }
+
+    if (vm.count("port"))
+    {
+      serial_port_ = vm["port"].as<std::string>();
     }
 
     if (vm.count("input-file"))

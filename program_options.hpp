@@ -11,12 +11,14 @@ public:
   operator bool() const { return continue_program_; }
 
   std::string hex_filename() const { return hex_filename_; }
+  std::string serial_port() const { return serial_port_; }
 
 private:
   ProgramOptions() {}
   bool continue_program_;
 
   std::string hex_filename_;
+  std::string serial_port_;
 };
 
 #endif // PROGRAM_OPTIONS_H_

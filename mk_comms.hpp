@@ -28,7 +28,7 @@ public:
   operator bool() const { return serial_; }
   int program_block_size() const { return program_block_size_; }
 
-  bool RequestBLComms();
+  bool RequestBLComms(const std::string &hex_filename);
   bool RequestClearFlash(const int bytes_to_clear) const;
   bool SendProgram(const uint8_t* const program, const int size) const;
   bool Exit() const;

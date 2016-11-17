@@ -12,7 +12,7 @@
 // ============================================================================+
 // Public functions:
 
-bool MKComms::RequestBLComms()
+bool MKComms::RequestBLComms(const std::string &hex_filename)
 {
   bool responded = false;
 
@@ -56,22 +56,30 @@ bool MKComms::RequestBLComms()
     return false;
 
   // Process the device signature.
-  // TODO: check that the device matches the hex file
+  bool device_match;
   switch (signature[0])
   {
     case DEVICE_TYPE_MEGA644:
+      device_match = (hex_filename.find("MEGA644") != std::string::npos);
       std::cout << "FlightCtrl w/ ATMega644" << std::endl;
       break;
     case DEVICE_TYPE_MEGA1284:
+      device_match = (hex_filename.find("MEGA1284") != std::string::npos);
       std::cout << "FlightCtrl w/ ATMega1284" << std::endl;
       break;
     case DEVICE_TYPE_STR911:
+      device_match = (hex_filename.find("STR9") != std::string::npos);
       std::cout << "NaviCtrl w/ STR911" << std::endl;
       break;
     default:
       std::cerr << "ERROR: Unsupported device." << std::endl;
       return false;
       break;
+  }
+  if (!device_match)
+  {
+    std::cerr << "ERROR: Hex file and device mismatch." << std::endl;
+    return false;
   }
   device_type_ = static_cast<DeviceType>(signature[0]);
 

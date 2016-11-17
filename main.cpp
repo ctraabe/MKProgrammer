@@ -21,7 +21,7 @@ int main (const int argc, const char* const argv[])
   if (!mk_comms)
     return 1;
 
-  if (!mk_comms.RequestBLComms())
+  if (!mk_comms.RequestBLComms(program_options.hex_filename()))
     return 1;
 
   // Clear the flash memory.
